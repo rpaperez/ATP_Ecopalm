@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1567755339977.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "3DB12F91",
+    "lastKnownWriteTime" : 30399714103918703,
+    "last_content_update" : 1567755339977,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "723894B9",
+        "caption" : "atp",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=atp&cache_key=723894B9",
+        "displayedObservations" : 2778,
+        "environment" : "",
+        "object" : "atp",
+        "preview" : 0,
+        "totalObservations" : 2778,
+        "variables" : 68
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

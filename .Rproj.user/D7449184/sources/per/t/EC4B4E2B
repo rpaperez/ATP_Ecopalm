@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1567756623150.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "646549362",
+    "id" : "EC4B4E2B",
+    "lastKnownWriteTime" : 1567756727,
+    "last_content_update" : 1567756727990,
+    "path" : "D:/PalmStudio/ATP_Ecopalm/ui.R",
+    "project_path" : "ui.R",
+    "properties" : {
+        "cursorPosition" : "7,6",
+        "scrollLine" : "1",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

@@ -1,0 +1,547 @@
+# Load packages -----------------------------------------------------------
+
+packs <- c('shiny','datasets',"lubridate", "stringr", "ggplot2",'dplyr','viridis','plotly','scales','tidyr','zoo')
+InstIfNec<-function (pack) {
+  if (!do.call(require,as.list(pack))) {
+    do.call(install.packages,as.list(pack))  }
+  do.call(require,as.list(pack)) }
+lapply(packs, InstIfNec)
+
+
+shinyServer(function(input, output) {
+  
+  # Functions ---------------------------------------------------------------
+  
+  
+  monnb <- function(d) { lt <- as.POSIXlt(as.Date(d, origin="1900-01-01"));
+  lt$year*12 + lt$mon } 
+  
+  # compute a month difference as a difference between two monnb's
+  mondf <- function(d1, d2) { monnb(d2) - monnb(d1) }  
+  
+  source('1-code/Find_errors.R')
+  
+  
+  # import data -------------------------------------------------------
+  
+  ###ECOPALM
+  
+  ##KNDE
+  knd=read.table(file = './0-data/Growth_Ecopalm_KNDE_cleaned.csv',header = T,sep=';',dec='.')
+  
+  sla_knde_raw=read.table(file = './0-data/SLA_Ecopalm.csv',header = T,sep=';',dec='.',fill=T)
+  
+
+  sla_knde=sla_knde_raw%>%
+    mutate(Date=dmy(Date),
+           TreeNb= ifelse(TreeNb=='',NA,TreeNb),
+           NbLeaf=ifelse(NbLeaf>0 & Date>'2008-01-01',-NbLeaf,NbLeaf))%>%
+    fill(Date,Progeny,TreeNb,NbLeaf,.direction = "down")%>%
+    mutate(Progeny=paste0('P',Progeny))%>%
+    mutate(LealfetArea=0.69*LealfetLength*LeafletMaxWidth,
+           SLA=LealfetArea/LeafletDW)%>%
+    group_by(Site,Progeny,TreeNb,NbLeaf)%>%
+    summarize(LealfetLength=mean(LealfetLength,na.rm=T),
+              LeafletMaxWidth=mean(LeafletMaxWidth,na.rm=T),
+              LeafletDW=mean(LeafletDW,na.rm=T),
+              LealfetArea=mean(LealfetArea,na.rm=T),
+              SLA=mean(SLA,na.rm=T))%>%
+    ungroup()
+  
+  
+ 
+  knd=knd%>%
+    mutate(Project='Ecopalm',
+           PlantingDate=dmy('01/01/1993'),
+           Progeny=as.factor(Progeny),
+           NewLeafDate=dmy(NewLeafDate),
+           PruningLeafDate=dmy(PruningLeafDate),
+           DryLeafDate=dmy(DryLeafDate),
+           BrokenLeafDate=dmy(BrokenLeafDate),
+           HarvestingBunchDate=dmy(HarvestingBunchDate),
+           SpatheOpeningDate=dmy(SpatheOpeningDate))
+  
+  
+  knd=merge(knd,sla_knde[,c('TreeNb','NbLeaf','LealfetLength','LeafletMaxWidth','LealfetArea','SLA')],all.x=T)
+  
+  
+  knd=knd%>%
+    mutate(RachisWaterContent=(RacSampleFW-RacSampleDW)/RacSampleFW,
+           RachisDW=RachisFW*(1-RachisWaterContent),
+           PetioleWaterContent=(PetSampleFW-PetSampleDW)/PetSampleFW,
+           PetioleDW=PetioleFW*(1-PetioleWaterContent),
+           LeafletWaterContent=(LeafSampleFW-LeafSampleDW)/LeafSampleFW,
+           LeafletDW=LeafletFW*(1-LeafletWaterContent),
+           PeduncleWaterContent=(PedSampleFW-PedSampleDW)/PedSampleFW,
+           PeduncleDW=PeduncleFW*(1-PeduncleWaterContent),
+           SpikeletWaterContent=(SpiSampleFW-SpiSampleDW)/SpiSampleFW,
+           SpikeletDW=SpikeletFW*(1-SpikeletWaterContent),
+           ParthenoFruitWaterContent=(ParthenoSampleFW-ParthenoSampleDW)/ParthenoSampleFW,
+           ParthenoFruitDW=ParthenoFruitFW*(1-ParthenoFruitWaterContent),
+           FruitWaterContent=(FruitSampleFW-FruitSampleDW)/FruitSampleFW,
+           FruitDW=FruitFW*(1-FruitWaterContent),
+           BunchFW=PeduncleFW+SpikeletFW+ParthenoFruitFW+FruitFW,
+           BunchDW=PeduncleDW+SpikeletDW+ParthenoFruitDW+FruitDW)
+  
+  
+  ####BMLE
+  bmle=read.table(file = './0-data/Growth_Ecopalm_BMLE_cleaned.csv',header = T,sep=';',dec='.')
+  bmle=bmle%>%
+    mutate(Project='Ecopalm',
+           PlantingDate=dmy('01/01/1993'),
+           Progeny=as.factor(Progeny),
+           NewLeafDate=dmy(NewLeafDate),
+           PruningLeafDate=dmy(PruningLeafDate),
+           DryLeafDate=dmy(DryLeafDate),
+           BrokenLeafDate=dmy(BrokenLeafDate),
+           HarvestingBunchDate=dmy(HarvestingBunchDate),
+           SpatheOpeningDate=dmy(SpatheOpeningDate))
+  
+  bmle=bmle%>%
+    mutate(RachisWaterContent=(RacSampleFW-RacSampleDW)/RacSampleFW,
+           RachisDW=RachisFW*(1-RachisWaterContent),
+           PetioleWaterContent=(PetSampleFW-PetSampleDW)/PetSampleFW,
+           PetioleDW=PetioleFW*(1-PetioleWaterContent),
+           LeafletWaterContent=(LeafSampleFW-LeafSampleDW)/LeafSampleFW,
+           LeafletDW=LeafletFW*(1-LeafletWaterContent),
+           PeduncleWaterContent=(PedSampleFW-PedSampleDW)/PedSampleFW,
+           PeduncleDW=PeduncleFW*(1-PeduncleWaterContent),
+           SpikeletWaterContent=(SpiSampleFW-SpiSampleDW)/SpiSampleFW,
+           SpikeletDW=SpikeletFW*(1-SpikeletWaterContent),
+           ParthenoFruitWaterContent=(ParthenoSampleFW-ParthenoSampleDW)/ParthenoSampleFW,
+           ParthenoFruitDW=ParthenoFruitFW*(1-ParthenoFruitWaterContent),
+           FruitWaterContent=(FruitSampleFW-FruitSampleDW)/FruitSampleFW,
+           FruitDW=FruitFW*(1-FruitWaterContent),
+           BunchFW=PeduncleFW+SpikeletFW+ParthenoFruitFW+FruitFW,
+           BunchDW=PeduncleDW+SpikeletDW+ParthenoFruitDW+FruitDW)
+  
+  
+  
+  
+  ####PHLE
+  phle=read.table(file = './0-data/Growth_Ecopalm_PHLE_cleaned.csv',header = T,sep=';',dec='.')
+  phle=phle%>%
+    mutate(Project='Ecopalm',
+           PlantingDate=dmy('01/01/2003'),
+           Progeny=as.factor(Progeny),
+           NewLeafDate=dmy(NewLeafDate),
+           PruningLeafDate=dmy(PruningLeafDate),
+           DryLeafDate=dmy(DryLeafDate),
+           BrokenLeafDate=dmy(BrokenLeafDate),
+           HarvestingBunchDate=dmy(HarvestingBunchDate),
+           SpatheOpeningDate=dmy(SpatheOpeningDate))
+  
+  
+  
+  phle=phle%>%
+    mutate(RachisWaterContent=(RacSampleFW-RacSampleDW)/RacSampleFW,
+           RachisDW=RachisFW*(1-RachisWaterContent),
+           LeafletWaterContent=(LeafSampleFW-LeafSampleDW)/LeafSampleFW,
+           LeafletDW=LeafletFW*(1-LeafletWaterContent),
+           PeduncleWaterContent=(PedSampleFW-PedSampleDW)/PedSampleFW,
+           PeduncleDW=PeduncleFW*(1-PeduncleWaterContent),
+           SpikeletWaterContent=(SpiSampleFW-SpiSampleDW)/SpiSampleFW,
+           SpikeletDW=SpikeletFW*(1-SpikeletWaterContent),
+           ParthenoFruitWaterContent=(ParthenoSampleFW-ParthenoSampleDW)/ParthenoSampleFW,
+           ParthenoFruitDW=ParthenoFruitFW*(1-ParthenoFruitWaterContent),
+           FruitWaterContent=(FruitSampleFW-FruitSampleDW)/FruitSampleFW,
+           FruitDW=FruitFW*(1-FruitWaterContent),
+           BunchFW=PeduncleFW+SpikeletFW+ParthenoFruitFW+FruitFW,
+           BunchDW=PeduncleDW+SpikeletDW+ParthenoFruitDW+FruitDW)
+  
+  
+  
+  ###  ATP reserves
+  atp=read.table(file = './0-data/Growth_ATP_KNDE_cleaned.csv',header = T,sep=';',dec='.')
+  atp=atp%>%
+    mutate(Project='ATP',
+           PlantingDate=dmy('01/01/1993'),
+           Progeny=as.factor(Progeny),
+           NewLeafDate=dmy(NewLeafDate),
+           PruningLeafDate=dmy(PruningLeafDate),
+           DryLeafDate=dmy(DryLeafDate),
+           BrokenLeafDate=dmy(BrokenLeafDate),
+           HarvestingBunchDate=dmy(HarvestingBunchDate),
+           SpatheOpeningDate=dmy(SpatheOpeningDate))
+  
+  
+  
+  sla_atp=read.table(file = './0-data/SLA_ATP.csv',header = T,sep=';',dec='.',fill=T)
+  
+  
+  sla_atp=sla_atp%>%
+    mutate(Date=dmy(Date),
+           TreeNb= ifelse(TreeNb=='',NA,TreeNb))%>%
+    fill(Date,Treatment,TreeNb,NbLeaf,.direction = "down")%>%
+    mutate(LealfetArea=0.69*LealfetLength*LeafletMaxWidth,
+           SLA=LealfetArea/LeafletDW)%>%
+    group_by(Site,Treatment,TreeNb,NbLeaf)%>%
+    summarize(LealfetLength=mean(LealfetLength,na.rm=T),
+              LeafletMaxWidth=mean(LeafletMaxWidth,na.rm=T),
+              LeafletDW=mean(LeafletDW,na.rm=T),
+              LealfetArea=mean(LealfetArea,na.rm=T),
+              SLA=mean(SLA,na.rm=T))%>%
+    ungroup()
+  
+  atp=atp%>%
+    mutate(RachisWaterContent=(RacSampleFW-RacSampleDW)/RacSampleFW,
+           RachisDW=RachisFW*(1-RachisWaterContent),
+           PetioleWaterContent=(PetSampleFW-PetSampleDW)/PetSampleFW,
+           PetioleDW=PetioleFW*(1-PetioleWaterContent),
+           LeafletWaterContent=(LeafSampleFW-LeafSampleDW)/LeafSampleFW,
+           LeafletDW=LeafletFW*(1-LeafletWaterContent),
+           PeduncleWaterContent=(PedSampleFW-PedSampleDW)/PedSampleFW,
+           PeduncleDW=PeduncleFW*(1-PeduncleWaterContent),
+           SpikeletWaterContent=(SpiSampleFW-SpiSampleDW)/SpiSampleFW,
+           SpikeletDW=SpikeletFW*(1-SpikeletWaterContent),
+           ParthenoFruitWaterContent=(ParthenoSampleFW-ParthenoSampleDW)/ParthenoSampleFW,
+           ParthenoFruitDW=ParthenoFruitFW*(1-ParthenoFruitWaterContent),
+           FruitWaterContent=(FruitSampleFW-FruitSampleDW)/FruitSampleFW,
+           FruitDW=FruitFW*(1-FruitWaterContent),
+           BunchFW=PeduncleFW+SpikeletFW+ParthenoFruitFW+FruitFW,
+           BunchDW=PeduncleDW+SpikeletDW+ParthenoFruitDW+FruitDW)
+  
+  atp=merge(atp,sla_atp[,c('Treatment','TreeNb','NbLeaf','LealfetLength','LeafletMaxWidth','LealfetArea','SLA')],all.x=T)
+  
+  
+  # merge data --------------------------------------------------------------
+  
+  cols=c( "Project",'Site',"PlantingDate",'Progeny','Treatment','TreeNb','NbLeaf',
+          "NewLeafDate","PruningLeafDate" ,"DryLeafDate","BrokenLeafDate","HarvestingBunchDate","SpatheOpeningDate",
+          'SpearNb',"BunchSex",
+          "PetioleLength","PetioleFW","PetioleWaterContent","PetioleDW",
+          "RachisLength","RachisFW","RachisWaterContent","RachisDW",
+          "LeafletNbRigth","LeafletNbLeft","LeafletTotNb","LeafletFW","LeafletWaterContent","LeafletDW",
+          'LealfetLength','LeafletMaxWidth','LealfetArea','SLA',
+          "BunchFW","BunchDW",
+          "PeduncleFW","PeduncleWaterContent","PeduncleDW",
+          'SpikeletNb',"SpikeletFW","SpikeletWaterContent","SpikeletDW",
+          "ParthenoFruitNb","ParthenoFruitFW","ParthenoFruitWaterContent","ParthenoFruitDW",
+          "FruitNb","FruitFW","FruitWaterContent","FruitDW",
+          "PulpSampleFW","PulpSampleDW","NutSampleFW","NutSampleDW")
+  
+  
+  knd=knd%>%
+    mutate(SpearNb=NA,SpikeletNb=NA)%>%
+    select(cols)
+  
+  bmle=bmle%>%
+    mutate(SpearNb=NA,SpikeletNb=NA,LealfetLength=NA,LeafletMaxWidth=NA,LealfetArea=NA,SLA=NA)%>%
+    select(cols)
+  
+  phle=phle%>%
+    mutate(SpearNb=NA,SpikeletNb=NA,PetioleLength=NA,PetioleFW=NA,PetioleWaterContent=NA,PetioleDW=NA,LealfetLength=NA,LeafletMaxWidth=NA,LealfetArea=NA,SLA=NA)%>%
+    select(cols)
+  
+  atp=atp%>%
+    select(cols)
+  
+  
+  don_all=rbind(knd,bmle,phle,atp)%>%
+    mutate(TreeNb=paste(Project,Site,Progeny,Treatment,TreeNb,sep='_'))%>%
+    mutate(SexInflo = recode(BunchSex,'F'="female",'A'='aborted','M'='male'),
+           SexInflo=ifelse(test =!(SexInflo %in% c('female','male','aborted')),yes = 'unopened',no= as.character(SexInflo)),
+           SexInflo=ifelse(test = SexInflo=='unopened' & !is.na(PruningLeafDate),yes ='aborted',no = as.character(SexInflo)),
+           SexInflo=ifelse(test = !is.na(PeduncleFW),yes = 'female',no = as.character(SexInflo)))##correction of inflorescence gender
+  
+  # don_ATP=don_all
+  # save(don_ATP,file='don_ATP.RData')
+  
+  # inputs ------------------------------------------------------------------
+  
+  proj<- reactive({
+    input$Project 
+  })
+  
+  sites<- reactive({
+    input$checkGroup 
+  })
+  
+  x_var<- reactive({
+    input$x_var})
+  
+  y_var<- reactive({
+    input$y_var})
+  
+  pheno_x_var<- reactive({
+    input$pheno_x_var})
+  
+  pheno_y_var<- reactive({
+    input$pheno_y_var})
+  
+  outliers<- reactive({
+    input$Outliers})
+  
+  average<- reactive({
+    input$Average})
+  
+  averageP<- reactive({
+    input$AveragePheno})
+  
+  # growth and production ---------------------------------------------------
+  
+  
+  don<-reactive({
+    
+    proj<- proj()
+    if (is.null(proj)) return(NULL)
+    
+    sites<- sites()
+    if (is.null(sites)) return(NULL)
+    
+    don=don_all%>%
+      filter(Project %in% proj &  Site %in% sites)%>%
+      mutate(id=paste(TreeNb,NbLeaf,sep='_'))
+  })
+  
+  
+  
+  #### graph  growth
+  
+  output$graph<-renderPlotly({
+    
+    proj<- proj()
+    if (is.null(proj)) return(NULL)
+    
+    sites<- sites()
+    if (is.null(sites)) return(NULL)
+    
+    x_var<- x_var()
+    if (is.null(x_var)) return(NULL)
+    
+    
+    y_var<- y_var()
+    if (is.null(y_var)) return(NULL)
+    
+    outliers<- outliers()
+    if (is.null(outliers)){
+      outliers='no_remove'
+    }
+    
+    average<- average()
+    if (is.null(average)){
+      average='individual'
+    }
+    
+    don<- don()
+    if (is.null(don)) return(NULL)
+    
+    prodVar=c("BunchFW","BunchDW","PeduncleFW","PeduncleWaterContent","PeduncleDW","SpikeletNb","SpikeletFW","SpikeletWaterContent","SpikeletDW","ParthenoFruitNb","ParthenoFruitFW","ParthenoFruitWaterContent", "ParthenoFruitDW","FruitNb"                   ,"FruitFW","FruitWaterContent","FruitDW","PulpSampleFW","PulpSampleDW","NutSampleFW","NutSampleDW")
+    
+    don=don%>%
+      mutate(ObservationMonth=ymd(paste0(str_sub(string =PruningLeafDate,start = 0,end = 7),'-01')))
+    
+    if(y_var %in% prodVar){
+      don=don%>%
+        mutate(ObservationMonth=ymd(paste0(str_sub(string =HarvestingBunchDate,start = 0,end = 7),'-01')))
+    }
+    ### detect outliers
+    
+    outlier=find_outliers(data = don,y_var =y_var,x_var=x_var,seq_var='NbLeaf')%>%
+      mutate(id=paste(TreeNb,NbLeaf,sep='_'))
+    
+    
+    list_out=unique(outlier$id)
+    while (nrow(outlier)>0){
+      
+      res=don%>%
+        filter(!(id %in% list_out))
+      
+      outlier=find_outliers(data = res,y_var =y_var,x_var=x_var,seq_var='NbLeaf')%>%
+        mutate(id=paste(TreeNb,NbLeaf,sep='_'))
+      
+      list_out=unique(c(list_out,unique(outlier$id)))
+    }
+    
+    
+    noOut=don%>%
+      filter(!(id %in% list_out))
+    
+    out=don%>%
+      filter(id %in% list_out)
+    
+    gr=ggplot()+
+      geom_line(data=noOut,aes_string(x=x_var,y=y_var,group='TreeNb',col='Treatment'))+
+      geom_point(data=noOut,aes_string(x=x_var,y=y_var,group='TreeNb',col='Treatment'),size=0.5)+
+      scale_color_viridis_d(name='')+
+      facet_grid(Site~Project)
+    
+    if (average=='average'){
+      gr=noOut%>%
+        mutate(factor=paste(Treatment,Progeny,sep='_'))%>%
+        group_by(Project,Site,Treatment,Progeny,factor,ObservationMonth)%>%
+        mutate(y_av=mean(get(y_var),na.rm=T),
+               x_av=mean(get(x_var),na.rm=T))%>%
+        ungroup()%>%
+        ggplot()+
+        geom_line(aes(x=x_av,y=y_av,group=factor,col=Treatment,lty=Progeny))+
+        scale_color_viridis_d(name='')+
+        scale_linetype_discrete(name='')+
+        facet_grid(Site~Project)+
+        ylab(y_var)+
+        xlab(x_var)
+    }
+    
+    if (outliers=='no_remove'){
+      gr=ggplot()+
+        geom_line(data=don,aes_string(x=x_var,y=y_var,group='TreeNb',col='Treatment'))+
+        geom_point(data=don,aes_string(x=x_var,y=y_var,group='TreeNb',col='Treatment'),size=0.5)+
+        geom_point(data=out,aes_string(x_var,y=y_var,group='TreeNb'),col=2,pch=0)+
+        scale_color_viridis_d(name='')+
+        facet_grid(Site~Project)
+      
+      if (average=='average'){
+        gr=don%>%
+          mutate(factor=paste(Treatment,Progeny,sep='_'))%>%
+          group_by(Project,Site,Treatment,Progeny,factor,ObservationMonth)%>%
+          mutate(y_av=mean(get(y_var),na.rm=T),
+                 x_av=mean(get(x_var),na.rm=T))%>%
+          ungroup()%>%
+          ggplot()+
+          geom_line(aes(x=x_av,y=y_av,group=factor,col=Treatment,lty=Progeny))+
+          scale_color_viridis_d(name='')+
+          scale_linetype_discrete(name='')+
+          facet_grid(Site~Project)+
+          ylab(y_var)+
+          xlab(x_var)
+      }
+      
+    }
+    
+    
+    ggplotly(gr)
+    
+  })
+  
+  
+  #  phenology ---------------------------------------------------------------
+  
+  pheno<-reactive({
+    
+    proj<- proj()
+    if (is.null(proj)) return(NULL)
+    
+    sites<- sites()
+    if (is.null(sites)) return(NULL)
+    
+    don<- don()
+    if (is.null(proj)) return(NULL)
+    
+    
+    pheno=don%>%
+      filter(!is.na(NewLeafDate))%>%
+      select(Project,Site,Treatment,Progeny,PlantingDate,TreeNb,NbLeaf,NewLeafDate,PruningLeafDate,DryLeafDate,BrokenLeafDate,SpatheOpeningDate,HarvestingBunchDate,SpearNb,SexInflo)%>%
+      mutate(NewLeafMonth=ymd(paste0(str_sub(string =NewLeafDate,start = 0,end = 7),'-01')),
+             NewLeafMAP=mondf(d2 = NewLeafDate,d1 = PlantingDate),
+             PruningLeafMonth=ymd(paste0(str_sub(string =PruningLeafDate,start = 0,end = 7),'-01')),
+             PruningLeafMAP=mondf(d2 = PruningLeafDate,d1 = PlantingDate),
+             SpatheOpeningMonth=ymd(paste0(str_sub(string =SpatheOpeningDate,start = 0,end = 7),'-01')),
+             SpatheOpeningMAP=mondf(d2 = SpatheOpeningDate,d1 = PlantingDate),
+             SpatheOpeningMonth=ymd(paste0(str_sub(string =SpatheOpeningDate,start = 0,end = 7),'-01')),
+             SpatheOpeningMAP=mondf(d2 = SpatheOpeningDate,d1 = PlantingDate),
+             HarvestingBunchMonth=ymd(paste0(str_sub(string =HarvestingBunchDate,start = 0,end = 7),'-01')),
+             HarvestingBunchMAP=mondf(d2 = HarvestingBunchDate,d1 = PlantingDate))
+    
+  })
+  
+  
+  output$graph_pheno<-renderPlotly({
+    
+    averageP<- averageP()
+    if (is.null(averageP)){
+      averageP='individual'
+    }
+    
+    proj<- proj()
+    if (is.null(proj)) return(NULL)
+    
+    sites<- sites()
+    if (is.null(sites)) return(NULL)
+    
+    pheno_x_var<- pheno_x_var()
+    if (is.null(pheno_x_var)) return(NULL)
+    
+    
+    pheno_y_var<- pheno_y_var()
+    if (is.null(pheno_y_var)) return(NULL)
+    
+    
+    pheno<- pheno()
+    if (is.null(proj)) return(NULL)
+    
+    
+    if (pheno_x_var=='NewLeafMonth'){
+      xlab='Date at leaf appearance'
+    }
+    if (pheno_x_var=='NewLeafMAP'){
+      xlab='Months after planting at leaf appearance'
+    }
+    
+    
+    nbLeaves=pheno%>%
+      select(Project,Site,Progeny,Treatment,TreeNb,NewLeafDate,NewLeafMAP,NewLeafMonth)%>%
+      group_by(Project,Site,Progeny,Treatment,TreeNb,NewLeafMAP,NewLeafMonth)%>%
+      summarize(Leaves=n())%>%
+      ungroup()
+    
+    print(nbLeaves)
+    
+    nbFemaleInflo=pheno%>%
+      filter(!is.na(SpatheOpeningDate) & !is.na(SexInflo) & SexInflo=='female')%>%
+      select(Project,Site,Progeny,Treatment,TreeNb,SpatheOpeningDate,NewLeafMonth)%>%
+      group_by(Project,Site,Progeny,Treatment,TreeNb,NewLeafMonth)%>%
+      summarize(female_inflo=n())%>%
+      ungroup()
+    
+    nbMaleInflo=pheno%>%
+      filter(!is.na(SpatheOpeningDate) & !is.na(SexInflo) & SexInflo=='male')%>%
+      select(Project,Site,Progeny,Treatment,TreeNb,SpatheOpeningDate,NewLeafMonth)%>%
+      group_by(Project,Site,Progeny,Treatment,TreeNb,NewLeafMonth)%>%
+      summarize(male_inflo=n())%>%
+      ungroup()
+    
+    nbBunches=pheno%>%
+      filter(!is.na(HarvestingBunchDate) & !is.na(SexInflo) & SexInflo=='female')%>%
+      select(Project,Site,Progeny,Treatment,TreeNb,HarvestingBunchDate,NewLeafMonth)%>%
+      group_by(Project,Site,Progeny,Treatment,TreeNb,NewLeafMonth)%>%
+      summarize(Bunches=n())%>%
+      ungroup()
+    
+    
+    table_id=nbLeaves%>%
+      full_join(nbFemaleInflo,by=c('Project','Site','Progeny','Treatment','TreeNb',"NewLeafMonth"))%>%
+      full_join(nbMaleInflo,by=c('Project','Site','Progeny','Treatment','TreeNb',"NewLeafMonth"))%>%
+      full_join(nbBunches,by=c('Project','Site','Progeny','Treatment','TreeNb',"NewLeafMonth"))%>%
+      tidyr::replace_na(list(nbLeaves=0,female_inflo=0,male_inflo=0,Bunches=0))
+    
+    # print(str(table_id))
+    
+    
+    gr_pheno=ggplot(data=table_id,aes_string(x=pheno_x_var,y=pheno_y_var,group='TreeNb',col='Treatment'))+
+      geom_line()+
+      geom_point(size=0.5)+
+      scale_color_viridis_d(name='')+
+      xlab(xlab)+
+      facet_grid(Site~Project)
+    
+    if (averageP=='average'){
+      gr_pheno=table_id%>%
+        mutate(factor=paste(Treatment,Progeny,sep='_'))%>%
+        group_by(Project,Site,Treatment,Progeny,factor,get(pheno_x_var))%>%
+        mutate(y_av=mean(get(pheno_y_var),na.rm=T))%>%
+        ungroup()%>%
+        ggplot(aes_string(x=pheno_x_var,y='y_av',group='factor',col='Treatment',lty='Progeny'))+
+        geom_line()+
+        scale_color_viridis_d(name='')+
+        scale_linetype_discrete(name='')+
+        ylab(pheno_y_var)+
+        xlab(xlab)+
+        facet_grid(Site~Project)
+    }
+    
+    ggplotly(gr_pheno)
+    
+  })
+  
+})
+  
